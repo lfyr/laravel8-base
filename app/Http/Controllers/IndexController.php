@@ -11,7 +11,7 @@ class IndexController extends Controller
     {
         set_time_limit(120);
         try {
-            for ($i = 1; $i <= 1000; $i++) {
+            for ($i = 1; $i <= 100; $i++) {
                 $data = [
                     "id" => $i,
                     "name" => "msg===" . $i,
