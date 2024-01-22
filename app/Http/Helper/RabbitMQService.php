@@ -2,6 +2,7 @@
 
 namespace App\Http\Helper;
 
+use App\Http\Service\MqLogService;
 use PhpAmqpLib\Connection\AMQPStreamConnection;
 use PhpAmqpLib\Message\AMQPMessage;
 
@@ -31,6 +32,10 @@ class RabbitMQService
      */
     public function producer($queue, $exchange, $routing_key, $msgBody)
     {
+        $mqLogService = app(MqLogService::class);
+
+        $mqKey = md5($msgBody . "product-mq");
+
         // 建立通道
         $channel = $this->conn->channel();
 
@@ -39,18 +44,38 @@ class RabbitMQService
 
         // 监听数据写入成功
         $channel->set_ack_handler(
-            function (AMQPMessage $message) {
-                // echo "Message acked with content " . $message->body . PHP_EOL;
-
-                // 发送成功修改发送状态 1-已发送
+            function (AMQPMessage $message) use ($mqLogService, $mqKey) {
+                $mqLog = $mqLogService->getByCond(["mq_key" => $mqKey]);
+                if ($mqLog) {
+                    $data = [
+                        "status" => 1,
+                    ];
+                    $mqLogService->updateOne($mqLog["id"], $data);
+                }
             }
         );
 
         // 监听数据写入失败
         $channel->set_nack_handler(
-            function (AMQPMessage $message) {
-                echo "Message nacked with content " . $message->body . PHP_EOL;
-                // 发送失败 尝试重新发送 尝试三次失败 修改状态为 2-发送失败
+            function (AMQPMessage $message) use ($mqLogService, $mqKey) {
+                $mqLog = $mqLogService->getByCond(["mq_key" => $mqKey]);
+                if ($mqLog) {
+                    if ($mqLog["retry_deliver_num"] < 3) {
+
+                        // 重新投递
+                        $message->nack(true);
+                        $data = [
+                            "retry_deliver_num" => $mqLog["retry_deliver_num"] + 1,
+                        ];
+                        $mqLogService->updateOne($mqLog["id"], $data);
+                    } else {
+                        $data = [
+                            "status" => 3,
+                        ];
+                        $mqLogService->updateOne($mqLog["id"], $data);
+                    }
+
+                }
             }
         );
 

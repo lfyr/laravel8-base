@@ -3,6 +3,7 @@
 namespace App\Console\Commands;
 
 use App\Http\Helper\RabbitMQService;
+use App\Http\Service\MqLogService;
 use Illuminate\Console\Command;
 
 class consumer extends Command
@@ -36,20 +37,44 @@ class consumer extends Command
      *
      * @return int
      */
-    public function handle(RabbitMQService $mq)
+    public function handle(RabbitMQService $mq, MqLogService $mqLog)
     {
+
         // 处理业务逻辑
-        $mq->consumer("product", function ($msg) {
-            $data = json_decode($msg->body, true);
+        $mq->consumer("product", function ($msg) use ($mqLog) {
 
-            // 处理业务
+            $mqKey = md5($msg->body . "product-mq");
+            $mqLog = $mqLog->getByCond(["mq_key" => $mqKey]);
+            // $msgData = json_decode($msg->body, true);
+            if ($mqLog) {
+                try {
+                    // TODO 处理业务
 
-            // 成功的时候ack
-            if ($data["id"] == 3 || $data["id"] == 30 || $data["id"] == 300) {
-                dump($data["id"] . $data["name"] . "消费失败");
-            } else {
-                dump($data["id"] . $data["name"] . "已消费");
-                $msg->ack();
+                    // 消费成功之后 修改状态 并确认消费
+                    $data = [
+                        "status" => 2,
+                    ];
+                    $mqLog->updateOne($mqLog["id"], $data);
+                    $msg->ack();
+                } catch (\Exception $e) {
+
+                    // 消费失败 检测是否超过三次失败
+                    if ($mqLog['consume_err_num'] < 3) {
+
+                        // 增加失败次数
+                        $data = [
+                            "consume_err_num" => $mqLog["consume_err_num"] + 1,
+                        ];
+                    } else {
+
+                        // 清除消息  修改为死信状态
+                        $msg->ack();
+                        $data = [
+                            "status" => 3,
+                        ];
+                    }
+                    $mqLog->updateOne($mqLog["id"], $data);
+                }
             }
         });
     }
