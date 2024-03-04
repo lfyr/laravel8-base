@@ -15,7 +15,7 @@ class IndexController extends Controller
             for ($i = 1; $i <= 2; $i++) {
                 $data = [
                     "id" => $i,
-                    "name" => "msg===" . $i,
+                    "name" => "msg===" . $i . time(),
                 ];
                 $msgBody = json_encode($data);
                 $mql->addOne([

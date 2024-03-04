@@ -2,7 +2,6 @@
 
 namespace App\Http\Service;
 
-use App\Http\Repository\CompetitionArticleColumnRepository;
 use App\Http\Repository\MqLogRepository;
 
 class MqLogService

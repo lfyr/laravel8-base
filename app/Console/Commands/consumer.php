@@ -37,15 +37,16 @@ class consumer extends Command
      *
      * @return int
      */
-    public function handle(RabbitMQService $mq, MqLogService $mqLog)
+    public function handle(RabbitMQService $mq, MqLogService $mls)
     {
 
         // 处理业务逻辑
-        $mq->consumer("product", function ($msg) use ($mqLog) {
+        $mq->consumer("product", function ($msg) use ($mls) {
 
             $mqKey = md5($msg->body . "product-mq");
-            $mqLog = $mqLog->getByCond(["mq_key" => $mqKey]);
-            // $msgData = json_decode($msg->body, true);
+            $mqLog = $mls->getByCond(["mq_key" => $mqKey]);
+            $msgData = json_decode($msg->body, true);
+            dump($msgData);
             if ($mqLog) {
                 try {
                     // TODO 处理业务
@@ -54,10 +55,13 @@ class consumer extends Command
                     $data = [
                         "status" => 2,
                     ];
-                    $mqLog->updateOne($mqLog["id"], $data);
-                    $msg->ack();
-                } catch (\Exception $e) {
+                    $res = $mls->updateOne($mqLog["id"], $data);
+                    dump($res);
 
+                    $msg->ack();
+
+                } catch (\Exception $e) {
+                  info("消费失败");
                     // 消费失败 检测是否超过三次失败
                     if ($mqLog['consume_err_num'] < 3) {
 
@@ -73,7 +77,7 @@ class consumer extends Command
                             "status" => 3,
                         ];
                     }
-                    $mqLog->updateOne($mqLog["id"], $data);
+                    $mls->updateOne($mqLog["id"], $data);
                 }
             }
         });

@@ -20,8 +20,6 @@ Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
 
 Route::get("produce", 'IndexController@produce');
 
-Route::get("consume", 'IndexController@consume');
-
 Route::group(['prefix' => 'auth'], function () {
     Route::post('login', 'AuthController@login');
     Route::post('register', 'AuthController@register');

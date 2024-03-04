@@ -45,6 +45,7 @@ class RabbitMQService
         // 监听数据写入成功
         $channel->set_ack_handler(
             function (AMQPMessage $message) use ($mqLogService, $mqKey) {
+                info("投递成功");
                 $mqLog = $mqLogService->getByCond(["mq_key" => $mqKey]);
                 if ($mqLog) {
                     $data = [
@@ -58,6 +59,9 @@ class RabbitMQService
         // 监听数据写入失败
         $channel->set_nack_handler(
             function (AMQPMessage $message) use ($mqLogService, $mqKey) {
+
+              info("投递失败");
+
                 $mqLog = $mqLogService->getByCond(["mq_key" => $mqKey]);
                 if ($mqLog) {
                     if ($mqLog["retry_deliver_num"] < 3) {
@@ -74,7 +78,6 @@ class RabbitMQService
                         ];
                         $mqLogService->updateOne($mqLog["id"], $data);
                     }
-
                 }
             }
         );
@@ -90,7 +93,7 @@ class RabbitMQService
 
         $config = [
             'content_type' => 'text/plain',
-            'delivery_mode' => AMQPMessage::DELIVERY_MODE_NON_PERSISTENT
+            'delivery_mode' => AMQPMessage::DELIVERY_MODE_PERSISTENT  // 持久化消息
         ];
 
 
